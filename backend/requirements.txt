@@ -10,3 +10,4 @@ beautifulsoup4
 pydantic
 httpx
 numpy
+python-docx==1.2.0

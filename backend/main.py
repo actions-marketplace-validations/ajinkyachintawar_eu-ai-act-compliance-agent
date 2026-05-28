@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.config import MISTRAL_MODEL
@@ -72,6 +73,26 @@ def _run_graph(system: SystemDescription) -> ComplianceReport:
 @app.post("/analyse", response_model=ComplianceReport)
 def analyse(system: SystemDescription) -> ComplianceReport:
     return _run_graph(system)
+
+
+@app.post("/export/annex-iv")
+def export_annex_iv(report: ComplianceReport) -> StreamingResponse:
+    """Generate and download an Annex IV Technical Documentation .docx from a ComplianceReport."""
+    from backend.export.annex_iv import build_annex_iv_docx
+
+    try:
+        docx_bytes = build_annex_iv_docx(report)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    safe_name = report.system.name.replace(" ", "_")[:40]
+    filename = f"Annex_IV_{safe_name}.docx"
+
+    return StreamingResponse(
+        iter([docx_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/scan", response_model=ScanReport)
