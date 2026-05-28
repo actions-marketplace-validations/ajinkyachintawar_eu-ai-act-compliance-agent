@@ -18,7 +18,7 @@ from backend.agents.prompts import (
     OBLIGATIONS_USER,
 )
 from backend.agents.state import AgentState
-from backend.config import MISTRAL_MODEL, NIM_API_KEY_INFERENCE, NIM_BASE_URL
+from backend.config import COMPLIANCE_MODEL, GROQ_API_KEY, GROQ_BASE_URL
 from backend.models.schemas import (
     AnnexIVDraft,
     Article6Exception,
@@ -34,7 +34,7 @@ from backend.rag.retriever import format_context, retrieve
 
 
 def _llm() -> OpenAI:
-    return OpenAI(api_key=NIM_API_KEY_INFERENCE, base_url=NIM_BASE_URL)
+    return OpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
 
 
 def _system_summary(state: AgentState) -> str:
@@ -53,7 +53,7 @@ def _system_summary(state: AgentState) -> str:
 
 def _chat_json(client: OpenAI, system: str, user: str) -> dict:
     response = client.chat.completions.create(
-        model=MISTRAL_MODEL,
+        model=COMPLIANCE_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
