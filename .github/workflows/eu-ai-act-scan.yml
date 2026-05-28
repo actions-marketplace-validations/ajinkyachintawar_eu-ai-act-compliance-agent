@@ -1,6 +1,7 @@
 name: EU AI Act Compliance Scan
 
 on:
+  workflow_dispatch:   # manual trigger from GitHub Actions tab
   pull_request:
     paths:
       - "**/*.py"
