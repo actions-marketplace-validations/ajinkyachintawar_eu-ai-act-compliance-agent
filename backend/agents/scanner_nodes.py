@@ -12,7 +12,7 @@ from backend.agents.scanner_prompts import (
     GENERATE_VIOLATIONS_USER,
 )
 from backend.agents.scanner_state import ScannerState
-from backend.config import MISTRAL_MODEL, NIM_API_KEY_INFERENCE, NIM_BASE_URL
+from backend.config import GROQ_API_KEY, GROQ_BASE_URL, SCANNER_MODEL
 from backend.models.schemas import (
     CodePattern,
     CodeViolation,
@@ -23,12 +23,13 @@ from backend.models.schemas import (
 
 
 def _llm() -> OpenAI:
-    return OpenAI(api_key=NIM_API_KEY_INFERENCE, base_url=NIM_BASE_URL)
+    # Groq: OpenAI-compatible, ~250 tok/s — much faster than NIM for code analysis
+    return OpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
 
 
 def _chat_json(client: OpenAI, system: str, user: str) -> dict:
     response = client.chat.completions.create(
-        model=MISTRAL_MODEL,
+        model=SCANNER_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
