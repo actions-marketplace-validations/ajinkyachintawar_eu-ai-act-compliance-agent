@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EU AI Act Compliance Classifier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            eu: { blue: '#003399', gold: '#FFCC00' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; }
+    .tab-active   { border-bottom: 3px solid #003399; color: #003399; font-weight: 600; }
+    .tab-inactive { border-bottom: 3px solid transparent; color: #6b7280; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+
+    /* Risk tier badges */
+    .tier-PROHIBITED    { background:#7B0000; color:#fff; }
+    .tier-HIGH_RISK     { background:#C00000; color:#fff; }
+    .tier-LIMITED_RISK  { background:#BF8200; color:#fff; }
+    .tier-MINIMAL_RISK  { background:#378644; color:#fff; }
+
+    /* Severity badges */
+    .sev-CRITICAL { background:#C00000; color:#fff; }
+    .sev-HIGH     { background:#E05C00; color:#fff; }
+    .sev-MEDIUM   { background:#BF8200; color:#fff; }
+    .sev-LOW      { background:#2563EB; color:#fff; }
+
+    /* Obligation status */
+    .obs-MET      { background:#E2EFDA; color:#378644; }
+    .obs-NOT_MET  { background:#FCE4D6; color:#C00000; }
+    .obs-UNCLEAR  { background:#FFF2CC; color:#BF8200; }
+
+    .spinner { border: 3px solid #e5e7eb; border-top-color: #003399;
+               border-radius: 50%; width: 28px; height: 28px;
+               animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    code { font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 0.82rem; }
+    textarea { font-family: 'Fira Code', 'Cascadia Code', monospace; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- ── Header ── -->
+<header class="bg-eu-blue text-white shadow-md">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
+    <div class="text-eu-gold text-3xl font-black">⚖</div>
+    <div>
+      <h1 class="text-xl font-bold tracking-tight">EU AI Act Compliance Classifier</h1>
+      <p class="text-blue-200 text-sm">LangGraph · RAG · Mistral Large · Groq · Supabase pgvector</p>
+    </div>
+    <div class="ml-auto flex gap-2">
+      <a href="https://github.com/ajinkyachintawar/eu-ai-act-compliance-agent"
+         target="_blank"
+         class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition">
+        GitHub ↗
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ── Tabs ── -->
+<div class="max-w-5xl mx-auto px-6 mt-6">
+  <div class="flex gap-6 border-b border-gray-200 mb-6">
+    <button onclick="showTab('describe')" id="tab-describe"
+            class="tab-active pb-3 text-sm transition">
+      🔍 Describe System
+    </button>
+    <button onclick="showTab('scan')" id="tab-scan"
+            class="tab-inactive pb-3 text-sm transition">
+      🛡 Scan Code
+    </button>
+    <button onclick="showTab('cicd')" id="tab-cicd"
+            class="tab-inactive pb-3 text-sm transition">
+      ⚙ CI/CD Setup
+    </button>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────
+       TAB 1 — DESCRIBE
+  ───────────────────────────────────────────────────────── -->
+  <div id="panel-describe">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <!-- Input -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="font-semibold text-gray-800 mb-1">Describe your AI system</h2>
+          <p class="text-xs text-gray-500 mb-3">
+            Plain English — what it does, who it affects, what sector it's in.
+          </p>
+          <textarea id="describe-input"
+            rows="9"
+            class="w-full text-sm border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-eu-blue/30 resize-none"
+            placeholder="e.g. We built a tool that reads job applications and ranks candidates automatically. HR managers see a shortlist with scores. We use it for hiring engineers at our fintech company."
+          ></textarea>
+          <button onclick="runDescribe()"
+            class="mt-3 w-full bg-eu-blue text-white text-sm font-medium py-2.5 rounded-lg hover:bg-blue-900 transition flex items-center justify-center gap-2">
+            <span id="describe-btn-text">Analyse →</span>
+            <span id="describe-spinner" class="spinner hidden"></span>
+          </button>
+          <p id="describe-status" class="text-xs text-gray-400 mt-2 text-center hidden"></p>
+        </div>
+
+        <!-- Quick examples -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Quick examples</p>
+          <div class="space-y-2">
+            <button onclick="fillExample('cv')"
+              class="w-full text-left text-xs text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition">
+              📄 CV Screening — Employment / HIGH RISK
+            </button>
+            <button onclick="fillExample('chatbot')"
+              class="w-full text-left text-xs text-green-700 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg transition">
+              💬 E-commerce Chatbot — MINIMAL RISK
+            </button>
+            <button onclick="fillExample('loan')"
+              class="w-full text-left text-xs text-red-700 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition">
+              🏦 Loan Approval AI — HIGH RISK
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="lg:col-span-3 space-y-4" id="describe-output" style="display:none">
+
+        <!-- Classification card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Risk Classification</p>
+              <span id="tier-badge" class="text-base font-bold px-3 py-1 rounded-full">—</span>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-500">Confidence</p>
+              <p id="confidence" class="text-2xl font-bold text-gray-800">—</p>
+            </div>
+          </div>
+          <p id="cl-reasoning" class="text-sm text-gray-600 mt-3 leading-relaxed"></p>
+          <p id="cl-articles" class="text-xs text-gray-400 mt-2"></p>
+        </div>
+
+        <!-- Obligations summary -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p class="text-xs text-gray-500 uppercase font-semibold mb-3">Obligations</p>
+          <div class="flex gap-3 mb-4">
+            <div class="flex-1 text-center bg-green-50 rounded-lg py-3">
+              <p id="obs-met" class="text-2xl font-bold text-green-700">—</p>
+              <p class="text-xs text-green-600">MET</p>
+            </div>
+            <div class="flex-1 text-center bg-red-50 rounded-lg py-3">
+              <p id="obs-not-met" class="text-2xl font-bold text-red-700">—</p>
+              <p class="text-xs text-red-600">NOT MET</p>
+            </div>
+            <div class="flex-1 text-center bg-yellow-50 rounded-lg py-3">
+              <p id="obs-unclear" class="text-2xl font-bold text-yellow-700">—</p>
+              <p class="text-xs text-yellow-600">UNCLEAR</p>
+            </div>
+          </div>
+          <div id="obs-list" class="space-y-1.5 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3">
+          <button id="dl-btn" onclick="downloadDocx()"
+            class="flex-1 bg-eu-blue text-white text-sm font-medium py-2.5 rounded-lg hover:bg-blue-900 transition">
+            ⬇ Download Annex IV (.docx)
+          </button>
+          <button onclick="clearDescribe()"
+            class="px-4 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="describe-empty" class="lg:col-span-3 flex items-center justify-center">
+        <div class="text-center text-gray-300 py-16">
+          <div class="text-6xl mb-4">⚖</div>
+          <p class="text-sm">Your compliance report will appear here.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────
+       TAB 2 — SCAN CODE
+  ───────────────────────────────────────────────────────── -->
+  <div id="panel-scan" style="display:none">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <!-- Input -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="font-semibold text-gray-800 mb-1">Scan source code</h2>
+          <p class="text-xs text-gray-500 mb-3">
+            Paste Python code to check for EU AI Act compliance gaps.
+          </p>
+          <input id="scan-filename" type="text" placeholder="filename.py"
+            class="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-eu-blue/30"
+            value="model.py" />
+          <textarea id="scan-code" rows="10"
+            class="w-full text-xs border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-eu-blue/30 resize-none"
+            placeholder="# Paste your Python code here..."></textarea>
+          <input id="scan-context" type="text"
+            placeholder="Optional: describe the AI system (e.g. loan approval model)"
+            class="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-eu-blue/30" />
+          <button onclick="runScan()"
+            class="mt-3 w-full bg-eu-blue text-white text-sm font-medium py-2.5 rounded-lg hover:bg-blue-900 transition flex items-center justify-center gap-2">
+            <span id="scan-btn-text">Scan →</span>
+            <span id="scan-spinner" class="spinner hidden"></span>
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Quick examples</p>
+          <div class="space-y-2">
+            <button onclick="fillScanExample('cv')"
+              class="w-full text-left text-xs text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition">
+              📄 CV Screener — missing logging & oversight
+            </button>
+            <button onclick="fillScanExample('loan')"
+              class="w-full text-left text-xs text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition">
+              🏦 Loan Approval — hardcoded threshold
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="lg:col-span-3">
+        <div id="scan-empty" class="flex items-center justify-center py-16">
+          <div class="text-center text-gray-300">
+            <div class="text-6xl mb-4">🛡</div>
+            <p class="text-sm">Scan results will appear here.</p>
+          </div>
+        </div>
+        <div id="scan-output" style="display:none" class="space-y-4">
+          <!-- Severity summary -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs text-gray-500 uppercase font-semibold">Scan Results</p>
+              <span id="scan-tier" class="text-xs font-bold px-2 py-0.5 rounded-full hidden"></span>
+            </div>
+            <div class="flex gap-3 mb-1">
+              <div class="flex-1 text-center bg-red-50 rounded-lg py-3">
+                <p id="scan-critical" class="text-2xl font-bold text-red-700">0</p>
+                <p class="text-xs text-red-600">CRITICAL</p>
+              </div>
+              <div class="flex-1 text-center bg-orange-50 rounded-lg py-3">
+                <p id="scan-high" class="text-2xl font-bold text-orange-700">0</p>
+                <p class="text-xs text-orange-600">HIGH</p>
+              </div>
+              <div class="flex-1 text-center bg-yellow-50 rounded-lg py-3">
+                <p id="scan-medium" class="text-2xl font-bold text-yellow-700">0</p>
+                <p class="text-xs text-yellow-600">MEDIUM</p>
+              </div>
+              <div class="flex-1 text-center bg-blue-50 rounded-lg py-3">
+                <p id="scan-low" class="text-2xl font-bold text-blue-700">0</p>
+                <p class="text-xs text-blue-600">LOW</p>
+              </div>
+            </div>
+            <p id="scan-summary-text" class="text-xs text-gray-500 mt-3 italic"></p>
+          </div>
+
+          <!-- Violations list -->
+          <div id="violations-list" class="space-y-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────────
+       TAB 3 — CI/CD SETUP
+  ───────────────────────────────────────────────────────── -->
+  <div id="panel-cicd" style="display:none">
+    <div class="max-w-3xl space-y-6">
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-semibold text-gray-800 mb-1">GitHub Action — CI/CD Gate</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Block PRs that introduce EU AI Act violations into your AI codebase.
+          Only needs a Groq API key — no deployed backend required.
+        </p>
+
+        <!-- Steps -->
+        <ol class="space-y-5">
+          <li class="flex gap-4">
+            <span class="flex-shrink-0 w-7 h-7 rounded-full bg-eu-blue text-white text-xs font-bold flex items-center justify-center">1</span>
+            <div>
+              <p class="font-medium text-sm text-gray-800">Add your Groq API key as a repository secret</p>
+              <p class="text-xs text-gray-500 mt-1">
+                GitHub repo → Settings → Secrets → Actions → <strong>New repository secret</strong>
+              </p>
+              <code class="block bg-gray-50 border border-gray-200 rounded px-3 py-2 mt-2 text-xs">
+                Name: GROQ_API_KEY<br/>
+                Value: gsk_your_key_here
+              </code>
+              <a href="https://console.groq.com" target="_blank"
+                 class="text-xs text-blue-600 hover:underline mt-1 inline-block">
+                Get a free Groq API key →
+              </a>
+            </div>
+          </li>
+
+          <li class="flex gap-4">
+            <span class="flex-shrink-0 w-7 h-7 rounded-full bg-eu-blue text-white text-xs font-bold flex items-center justify-center">2</span>
+            <div class="w-full">
+              <p class="font-medium text-sm text-gray-800">Create the workflow file</p>
+              <p class="text-xs text-gray-500 mt-1 mb-2">
+                Add this to <code>.github/workflows/eu-ai-act-scan.yml</code>
+              </p>
+              <div class="relative">
+                <pre id="yaml-snippet" class="bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto">name: EU AI Act Compliance Scan
+
+on:
+  pull_request:
+    paths: ["**/*.py"]
+
+jobs:
+  compliance-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: EU AI Act Compliance Scan
+        uses: ajinkyachintawar/eu-ai-act-compliance-agent@main
+        with:
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          files: "src/**/*.py"
+          system-context: "Describe your AI system here"
+          fail-on: CRITICAL   # CRITICAL | HIGH | MEDIUM | LOW | NONE
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eu-ai-act-scan-report
+          path: eu-ai-act-scan-report.json</pre>
+                <button onclick="copyYaml()"
+                  class="absolute top-3 right-3 text-xs bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition">
+                  Copy
+                </button>
+              </div>
+            </div>
+          </li>
+
+          <li class="flex gap-4">
+            <span class="flex-shrink-0 w-7 h-7 rounded-full bg-eu-blue text-white text-xs font-bold flex items-center justify-center">3</span>
+            <div>
+              <p class="font-medium text-sm text-gray-800">Add the README badge</p>
+              <p class="text-xs text-gray-500 mt-1 mb-2">Shows compliance scan status on your repo.</p>
+              <div class="relative">
+                <pre id="badge-snippet" class="bg-gray-900 text-green-300 text-xs rounded-lg p-4">[![EU AI Act Scan](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/eu-ai-act-scan.yml/badge.svg)](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/eu-ai-act-scan.yml)</pre>
+                <button onclick="copyBadge()"
+                  class="absolute top-3 right-3 text-xs bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded transition">
+                  Copy
+                </button>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <!-- How it works -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="font-semibold text-gray-800 mb-4">How it works</h3>
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-2xl mb-2">📂</div>
+            <p class="text-xs font-semibold text-gray-700">Detects patterns</p>
+            <p class="text-xs text-gray-500 mt-1">Finds model inference, automated decisions, personal data processing</p>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-2xl mb-2">⚖</div>
+            <p class="text-xs font-semibold text-gray-700">Maps to articles</p>
+            <p class="text-xs text-gray-500 mt-1">Art. 9, 10, 12, 13, 14, 15, 50 — with specific citations</p>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="text-2xl mb-2">🚦</div>
+            <p class="text-xs font-semibold text-gray-700">Gates the PR</p>
+            <p class="text-xs text-gray-500 mt-1">Fails on CRITICAL by default. Configurable threshold.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-400 text-center mt-8 mb-6">
+    Built with LangGraph · Mistral Large via NVIDIA NIM · Groq · Supabase pgvector ·
+    <a href="https://github.com/ajinkyachintawar/eu-ai-act-compliance-agent" class="hover:underline">GitHub ↗</a>
+  </p>
+</div>
+
+<script>
+const API = 'http://localhost:8001';
+let lastReport = null;
+
+// ── Tab switching ──────────────────────────────────────────
+
+function showTab(name) {
+  ['describe','scan','cicd'].forEach(t => {
+    document.getElementById(`panel-${t}`).style.display = t === name ? '' : 'none';
+    const el = document.getElementById(`tab-${t}`);
+    el.className = t === name ? 'tab-active pb-3 text-sm transition' : 'tab-inactive pb-3 text-sm transition';
+  });
+}
+
+// ── Examples ──────────────────────────────────────────────
+
+const EXAMPLES = {
+  cv: "We built a tool that reads job applications and ranks candidates automatically. HR managers see a shortlist with scores. We use it for hiring engineers at our fintech company.",
+  chatbot: "We built an AI chatbot for our e-commerce website that answers customer questions about returns, shipping times, and order status. It can escalate to a human agent. No personal decisions are made.",
+  loan: "Our bank uses an AI model to approve or reject personal loan applications automatically. The model scores applicants and decisions are made without human review for scores above 750."
+};
+
+const SCAN_EXAMPLES = {
+  cv: {
+    file: "cv_screener.py",
+    context: "CV screening tool that ranks job applicants for HR managers",
+    code: `import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+import pickle
+
+def load_model():
+    with open("model.pkl", "rb") as f:
+        return pickle.load(f)
+
+def score_candidates(df: pd.DataFrame):
+    model = load_model()
+    scores = model.predict_proba(df)[:, 1]
+    df["score"] = scores
+    shortlist = df[df["score"] > 0.7].sort_values("score", ascending=False)
+    return shortlist.head(10)
+
+if __name__ == "__main__":
+    data = pd.read_csv("candidates.csv")
+    result = score_candidates(data)
+    result.to_csv("shortlist.csv", index=False)
+    print(f"Shortlisted {len(result)} candidates.")`
+  },
+  loan: {
+    file: "loan_approver.py",
+    context: "Automated loan approval AI for a bank",
+    code: `def approve_loan(credit_score: int, income: float, debt: float) -> dict:
+    debt_ratio = debt / income if income > 0 else 1.0
+    if credit_score > 750 and debt_ratio < 0.4:
+        decision = "APPROVED"
+    elif credit_score > 650 and debt_ratio < 0.3:
+        decision = "APPROVED"
+    else:
+        decision = "REJECTED"
+    return {"decision": decision, "score": credit_score}
+
+if __name__ == "__main__":
+    result = approve_loan(720, 50000, 15000)
+    print(result)`
+  }
+};
+
+function fillExample(key) {
+  document.getElementById('describe-input').value = EXAMPLES[key];
+}
+
+function fillScanExample(key) {
+  const ex = SCAN_EXAMPLES[key];
+  document.getElementById('scan-filename').value = ex.file;
+  document.getElementById('scan-context').value = ex.context;
+  document.getElementById('scan-code').value = ex.code;
+}
+
+// ── Describe ──────────────────────────────────────────────
+
+async function runDescribe() {
+  const desc = document.getElementById('describe-input').value.trim();
+  if (!desc) return;
+
+  setLoading('describe', true, 'Analysing… (~2-3 min)');
+  try {
+    const res = await fetch(`${API}/describe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    lastReport = await res.json();
+    renderDescribeReport(lastReport);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    setLoading('describe', false);
+  }
+}
+
+function renderDescribeReport(r) {
+  const cl = r.classification;
+  const ob = r.obligations;
+
+  // Tier badge
+  const badge = document.getElementById('tier-badge');
+  badge.textContent = cl.tier;
+  badge.className = `text-base font-bold px-3 py-1 rounded-full tier-${cl.tier}`;
+
+  document.getElementById('confidence').textContent = Math.round(cl.confidence * 100) + '%';
+  document.getElementById('cl-reasoning').textContent = cl.reasoning;
+  document.getElementById('cl-articles').textContent = 'Cited: ' + cl.cited_articles.join(', ');
+
+  document.getElementById('obs-met').textContent = ob.total_met;
+  document.getElementById('obs-not-met').textContent = ob.total_not_met;
+  document.getElementById('obs-unclear').textContent = ob.total_unclear;
+
+  // Obligations list
+  const list = document.getElementById('obs-list');
+  list.innerHTML = ob.obligations.map(o => `
+    <div class="flex items-start gap-2 text-xs">
+      <span class="obs-${o.status} px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0">${o.status}</span>
+      <span class="text-gray-700"><strong>${o.article}</strong> — ${o.title}</span>
+    </div>`).join('');
+
+  document.getElementById('describe-output').style.display = '';
+  document.getElementById('describe-empty').style.display = 'none';
+}
+
+async function downloadDocx() {
+  if (!lastReport) return;
+  const btn = document.getElementById('dl-btn');
+  btn.textContent = '⏳ Generating...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API}/export/annex-iv`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lastReport)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const name = lastReport.system?.name?.replace(/\s+/g,'_') || 'System';
+    a.href = url; a.download = `Annex_IV_${name}.docx`; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Export error: ' + e.message);
+  } finally {
+    btn.textContent = '⬇ Download Annex IV (.docx)';
+    btn.disabled = false;
+  }
+}
+
+function clearDescribe() {
+  document.getElementById('describe-input').value = '';
+  document.getElementById('describe-output').style.display = 'none';
+  document.getElementById('describe-empty').style.display = '';
+  lastReport = null;
+}
+
+// ── Scan ──────────────────────────────────────────────────
+
+async function runScan() {
+  const code = document.getElementById('scan-code').value.trim();
+  if (!code) return;
+
+  setLoading('scan', true, 'Scanning… (~5-10s)');
+  try {
+    const res = await fetch(`${API}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        file_name: document.getElementById('scan-filename').value || 'code.py',
+        system_context: document.getElementById('scan-context').value
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    renderScanReport(await res.json());
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    setLoading('scan', false);
+  }
+}
+
+function renderScanReport(r) {
+  document.getElementById('scan-critical').textContent = r.total_critical;
+  document.getElementById('scan-high').textContent = r.total_high;
+  document.getElementById('scan-medium').textContent = r.total_medium;
+  document.getElementById('scan-low').textContent = r.total_low;
+  document.getElementById('scan-summary-text').textContent = r.summary;
+
+  if (r.risk_tier_suggestion) {
+    const el = document.getElementById('scan-tier');
+    el.textContent = r.risk_tier_suggestion;
+    el.className = `text-xs font-bold px-2 py-0.5 rounded-full tier-${r.risk_tier_suggestion}`;
+    el.classList.remove('hidden');
+  }
+
+  const list = document.getElementById('violations-list');
+  list.innerHTML = r.violations.map(v => `
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="sev-${v.severity} text-[10px] font-bold px-2 py-0.5 rounded-full">${v.severity}</span>
+        <span class="text-xs font-semibold text-gray-700">${v.rule_id} — ${v.title}</span>
+        <span class="ml-auto text-[10px] text-gray-400">${v.article}</span>
+      </div>
+      <p class="text-xs text-gray-600 mb-2">${v.description}</p>
+      ${v.code_snippet ? `<pre class="bg-gray-50 border border-gray-200 rounded p-2 text-xs text-gray-700 mb-2"><code>${escHtml(v.code_snippet)}</code></pre>` : ''}
+      <p class="text-xs text-blue-700"><strong>Fix:</strong> ${v.recommendation}</p>
+    </div>`).join('');
+
+  document.getElementById('scan-empty').style.display = 'none';
+  document.getElementById('scan-output').style.display = '';
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+function setLoading(panel, on, msg = '') {
+  const btnText = document.getElementById(`${panel}-btn-text`);
+  const spinner = document.getElementById(`${panel}-spinner`);
+  const status  = document.getElementById(`${panel}-status`);
+  btnText.textContent = on ? 'Running…' : (panel === 'describe' ? 'Analyse →' : 'Scan →');
+  spinner.classList.toggle('hidden', !on);
+  if (status) {
+    status.textContent = msg;
+    status.classList.toggle('hidden', !on);
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyYaml() {
+  navigator.clipboard.writeText(document.getElementById('yaml-snippet').textContent);
+  event.target.textContent = 'Copied!';
+  setTimeout(() => event.target.textContent = 'Copy', 1500);
+}
+
+function copyBadge() {
+  navigator.clipboard.writeText(document.getElementById('badge-snippet').textContent);
+  event.target.textContent = 'Copied!';
+  setTimeout(() => event.target.textContent = 'Copy', 1500);
+}
+</script>
+</body>
+</html>
