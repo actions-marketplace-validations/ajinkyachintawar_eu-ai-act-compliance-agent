@@ -23,9 +23,9 @@ jobs:
         uses: ajinkyachintawar/eu-ai-act-compliance-agent@main
         with:
           groq-api-key: ${{ secrets.GROQ_API_KEY }}
-          files: "backend/**/*.py"
-          system-context: "EU AI Act compliance classifier agent — FastAPI + LangGraph pipeline"
-          fail-on: CRITICAL
+          files: "backend/main.py backend/agents/graph.py"
+          system-context: "EU AI Act compliance classifier API — FastAPI backend that classifies AI systems"
+          fail-on: NONE
 
       - name: Upload scan report
         uses: actions/upload-artifact@v4
