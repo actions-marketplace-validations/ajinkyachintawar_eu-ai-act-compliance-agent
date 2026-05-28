@@ -15,8 +15,7 @@ def _require(name: str) -> str:
     return value
 
 
-# --- NIM API keys (two separate keys for the two NIM endpoints) ---
-NIM_API_KEY_INFERENCE: str = _require("NIM_API_KEY_INFERENCE")
+# --- NIM API key (embeddings only — inference has moved to Groq) ---
 NIM_API_KEY_EMBED: str = _require("NIM_API_KEY_EMBED")
 
 # --- Shared NIM base URL ---
