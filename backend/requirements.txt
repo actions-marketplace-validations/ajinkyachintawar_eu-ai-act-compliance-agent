@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+langgraph
+langchain
+openai
+supabase
+python-dotenv
+pypdf
+beautifulsoup4
+pydantic
+httpx
+numpy

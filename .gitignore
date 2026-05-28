@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Corpus & generated
+backend/rag/corpus/
+graphify-out/
+*.pkl
+*.joblib
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Tools
+.DS_Store
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
