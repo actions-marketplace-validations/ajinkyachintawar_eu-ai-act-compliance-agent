@@ -1,0 +1,62 @@
+name: EU AI Act Compliance Scanner
+description: >
+  Scan Python source code for EU AI Act compliance violations.
+  Uses Groq (llama-3.3-70b) for fast inference — typical scan time < 10s per file.
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  groq-api-key:
+    description: Groq API key (get a free key at https://console.groq.com)
+    required: true
+  files:
+    description: >
+      Space-separated list of Python files or glob patterns to scan.
+      Defaults to all .py files in the repository.
+    required: false
+    default: "**/*.py"
+  system-context:
+    description: >
+      Optional plain-English description of the AI system being scanned.
+      Helps the scanner make more accurate violation assessments.
+    required: false
+    default: ""
+  fail-on:
+    description: >
+      Minimum violation severity that causes the action to fail.
+      One of: CRITICAL, HIGH, MEDIUM, LOW, NONE (never fail).
+    required: false
+    default: "CRITICAL"
+
+outputs:
+  total-violations:
+    description: Total number of violations found across all scanned files
+    value: ${{ steps.scan.outputs.total-violations }}
+  critical-count:
+    description: Number of CRITICAL violations found
+    value: ${{ steps.scan.outputs.critical-count }}
+  high-count:
+    description: Number of HIGH violations found
+    value: ${{ steps.scan.outputs.high-count }}
+  report-path:
+    description: Path to the full JSON scan report
+    value: ${{ steps.scan.outputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install scanner dependencies
+      shell: bash
+      run: pip install openai --quiet
+
+    - name: Run EU AI Act compliance scan
+      id: scan
+      shell: bash
+      env:
+        GROQ_API_KEY: ${{ inputs.groq-api-key }}
+        SCAN_FILES: ${{ inputs.files }}
+        SYSTEM_CONTEXT: ${{ inputs.system-context }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: python ${{ github.action_path }}/scan_action.py

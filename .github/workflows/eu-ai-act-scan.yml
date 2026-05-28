@@ -1,0 +1,36 @@
+name: EU AI Act Compliance Scan
+
+on:
+  pull_request:
+    paths:
+      - "**/*.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.py"
+
+jobs:
+  compliance-scan:
+    name: Scan for EU AI Act violations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: EU AI Act Compliance Scan
+        uses: ajinkyachintawar/eu-ai-act-compliance-agent@main
+        with:
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          files: "backend/**/*.py"
+          system-context: "EU AI Act compliance classifier agent — FastAPI + LangGraph pipeline"
+          fail-on: CRITICAL
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eu-ai-act-scan-report
+          path: eu-ai-act-scan-report.json
+          retention-days: 30
