@@ -1,7 +1,6 @@
 name: EU AI Act Compliance Scanner
-description: >
-  Scan Python source code for EU AI Act compliance violations.
-  Uses Groq (llama-3.3-70b) for fast inference — typical scan time < 10s per file.
+description: >-
+  Scan Python code for EU AI Act violations on every PR. Maps findings to articles with severity and fix recommendations.
 
 branding:
   icon: shield
