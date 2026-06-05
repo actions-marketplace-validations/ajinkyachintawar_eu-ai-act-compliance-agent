@@ -1,5 +1,7 @@
 # EU AI Act Compliance Classifier Agent
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-EU%20AI%20Act%20Compliance%20Scanner-blue?logo=github)](https://github.com/marketplace/actions/eu-ai-act-compliance-scanner)
+
 > A multi-agent LangGraph system that classifies AI systems against the EU AI Act (Regulation 2024/1689), generates structured compliance reports, scans source code for regulatory violations, and ships as a reusable GitHub Action CI/CD gate.
 
 ---
